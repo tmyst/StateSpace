@@ -1,0 +1,151 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(data.table)
+library(dlm)
+library(rstan)
+library(lubridate)
+```
+
+
+```{r}
+data(Nile)
+df <- Nile %>% data.frame(y = .) %>% rowid_to_column("x")
+nile_plot <- df %>% ggplot() + geom_line(aes(x = x, y = y)) + theme_bw(base_family = "Times", base_size = 16)
+nile_plot
+```
+
+```{r}
+df <- fread("Data/radio_mito_kencho.csv")
+df$time %>% min
+df$time %>% max
+df[, region:= NULL]
+df[, area  := NULL]
+df[, unit  := NULL]
+df[, lat   := NULL]
+df[, lon   := NULL] 
+df[, ymd:=str_sub(time, 1, 10)]
+df[, mean_value:= mean(value), by = ymd]
+df[, value:=NULL]
+df[, time:=NULL]
+df <- df[, .SD[1], by = "ymd"]
+names(df)[names(df) == "mean_value"] <- "value"
+df$ymd <- df$ymd %>% lubridate::as_date()
+
+df %>% ggplot() + geom_line(aes(x = ymd, y = value)) + theme_bw(base_size = 16, base_family = "Times")
+# df %>% write.table("Data/radio_mito_kencho_ymd.csv", row.names = F, col.names = T, sep = ",", quote = F)
+```
+
+```{r}
+# ishioka_files <- list.files("Data/Radio_Ishioka_HokenCenter/", full.names = T)
+# ishioka <- ishioka_files %>% lapply(function(x)read_csv(x, locale = locale(encoding = "CP932"), col_names = names(df))[, 1:7]) %>% bind_rows
+# ishioka <- ishioka %>% group_by(time) %>% filter(row_number() ==1) %>% ungroup %>% arrange(time) 
+# ishioka %>% write.table("Data/Radio_Ishioka_HokenCenter/radio_ishioka_hoken.csv", col.names = T, row.names = F, sep = ",", fileEncoding = "UTF-8", quote = F)
+```
+
+```{r}
+df <- fread("Data/radio_mito_kencho_ymd.csv")
+```
+
+前の測定日との差が１でない場合を抽出する
+```{r}
+df <- df %>% mutate(ymd = as_date(ymd)) %>% arrange(ymd)
+df %>% 
+  mutate(previousymd = lag(ymd)) %>% 
+  mutate(diff = ymd - previousymd) %>% 
+  filter(diff != 1 | diff %>% is.na) -> irreglar_records
+irreglar_records
+```
+欠測の部分をNAとして代入する
+```{r}
+na_df <- 2:nrow(irreglar_records) %>% lapply(function(i){
+  seq(irreglar_records$previousymd[i] + 1, irreglar_records$ymd[i] -1, 1) %>% data.frame(ymd = .)
+}) %>% bind_rows %>% mutate(value = NA)
+comp_df <- bind_rows(df, na_df) %>% arrange(ymd)
+comp_df %>% ggplot() + geom_line(aes(x = ymd, y = value)) + theme_bw()
+
+```
+
+時系列データへの変換
+```{r}
+comp_df
+df_ts <- ts(comp_df$value, start = comp_df$ymd[1])
+
+```
+
+ts.plotを使ったプロット
+```{r}
+df_ts2 <- 2*df_ts
+ts.plot(cbind(df_ts, df_ts2), lty=c("solid", "dashed"))
+```
+
+```{r}
+tsp(df_ts)
+```
+
+```{r}
+time(df_ts)
+```
+#### いったんもとのdfに戻る
+曜日の確認
+```{r}
+df$ymd %>% weekdays()
+```
+
+```{r}
+co2 <- fread("Data/co2.txt")
+names(co2)[3] <- 
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
