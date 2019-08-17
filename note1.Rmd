@@ -1,14 +1,29 @@
 ---
 title: "R Notebook"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r}
+rm(list =ls(all.names = T))
+gc()
 library(tidyverse)
 library(data.table)
 library(dlm)
 library(rstan)
 library(lubridate)
+library(zoo)
+library(xts)
+library(timeSeries)
+library(tseries)
+library(forecast)
+library(vars)
+library(egg)
+# library(ggpmisc)
+# library(strucchange)
+# library(changepoint)
+
 ```
 
 
@@ -55,11 +70,13 @@ df <- fread("Data/radio_mito_kencho_ymd.csv")
 ```{r}
 df <- df %>% mutate(ymd = as_date(ymd)) %>% arrange(ymd)
 df %>% 
-  mutate(previousymd = lag(ymd)) %>% 
+  mutate(previousymd = dplyr::lag(ymd)) %>% 
   mutate(diff = ymd - previousymd) %>% 
-  filter(diff != 1 | diff %>% is.na) -> irreglar_records
+  dplyr::filter(diff != days(1) | diff %>% is.na) -> irreglar_records
 irreglar_records
+
 ```
+
 欠測の部分をNAとして代入する
 ```{r}
 na_df <- 2:nrow(irreglar_records) %>% lapply(function(i){
@@ -74,7 +91,6 @@ comp_df %>% ggplot() + geom_line(aes(x = ymd, y = value)) + theme_bw()
 ```{r}
 comp_df
 df_ts <- ts(comp_df$value, start = comp_df$ymd[1])
-
 ```
 
 ts.plotを使ったプロット
@@ -90,6 +106,7 @@ tsp(df_ts)
 ```{r}
 time(df_ts)
 ```
+
 #### いったんもとのdfに戻る
 曜日の確認
 ```{r}
@@ -97,31 +114,83 @@ df$ymd %>% weekdays()
 ```
 
 ```{r}
-co2 <- fread("Data/co2.txt")
-names(co2)[3] <- 
+co2 <- fread("Data/co2.txt") 
+co2[, value:=ifelse(mean_co2_ayasato_ppm == "--", NA, mean_co2_ayasato_ppm) %>% as.numeric]
+co2[, mean_co2_ayasato_ppm:=NULL]
+co2_ts <- ts(data = co2$value, start = c(1987, 1), frequency = 12)
+co2_ts <- co2_ts %>% window(end = c(2014, 2))
+ts.plot(co2_ts)
+```
+
+
+[ggplot for ts object](http://www.sthda.com/english/articles/32-r-graphics-essentials/128-plot-time-series-data-using-ggplot/)
+
+```{r}
+library(ggfortify)
+co2 <- co2 %>% mutate(rn = row_number()) 
+
+my_theme <- theme_bw(base_family = "Times", base_size = 16)
+p1 <- ggplot(df, aes(x = ymd, y = value)) + geom_line() + my_theme
+p2 <- co2  %>% ggplot(aes(x =rn , y = value)) + geom_line() + my_theme
+p3 <- UKgas %>% changepoint::cpt.meanvar() %>% autoplot() + my_theme
+p4 <- autoplot(AirPassengers) + my_theme
+
+ggarrange(p1, p2, p3, p4, nrow = 2)
+```
+
+
+```{r}
+log_UKgas_plot <- log(UKgas) %>% autoplot + my_theme
+ggarrange(p3, log_UKgas_plot)
+```
+
++ 自己相関
+
+欠損値の扱いは難しいことがある
+```{r}
+co2_na_point <- which(co2_ts %>% is.na)
+co2_ts_ <- co2_ts
+co2_ts_[co2_na_point] <- (co2_ts[co2_na_point-1] + co2_ts[co2_na_point +1])/2
+acf(co2_ts_)#これはbaseのグラフを描く
+autoplot(acf(co2_ts_)) + my_theme
+```
+
+通常のacf関数だと欠損値をうまく扱ってくれないが、forecastパッケージ中のggAcfを使うと回避してくれる
+```{r}
+library(forecast)
+ac1 <- ggAcf(df_ts) +my_theme
+ac2 <- ggAcf(co2_ts) + my_theme
+ac3 <- ggAcf(UKgas %>% log) + my_theme + labs(title ="log UKgas")
+ac4 <- ggAcf(AirPassengers) + my_theme
+ggarrange(ac1, ac2, ac3, ac4, nrow = 2)
 ```
 
 ```{r}
+co2_fft <- abs(fft(co2_ts_))
+len <- length(co2_fft)
+tsp(co2_fft) 
+autoplot(co2_fft/max(co2_fft)) + scale_x_continuous(breaks = c(1, 2, 4, 12))
+
+```
+
+いろいろなforecastパッケージの関数
+```{r}
+ggcpgram(arima.sim(list(ar = c(0.7, -0.5)), n = 50))
+ggtsdiag(auto.arima(AirPassengers))
+gglagplot(AirPassengers, lags = 4)
+ggfreqplot(AirPassengers)
+ggfreqplot(AirPassengers, freq = 4)
+ggPacf(AirPassengers)
+ggCcf(co2$rn, co2$value, lag.max = NULL, type = c("correlation", "covariance"))
+ggtaperedacf(co2_ts_, lag.max = NULL, type = c("correlation", "partial"), calc.ci = TRUE, level = 95, nsim = 100)
+ggtaperedpacf(co2_ts_)
 
 ```
 
 ```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
+autoplot(acf(AirPassengers, plot = FALSE), conf.int.fill = '#0000FF', conf.int.value = 0.8, conf.int.type = 'ma')
+autoplot(spec.ar(AirPassengers, plot = FALSE))
+autoplot(stl(AirPassengers, s.window = 'periodic'), ts.colour = 'blue')
 
 ```
 
