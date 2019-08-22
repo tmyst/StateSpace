@@ -6,8 +6,8 @@ output:
 ---
 
 ```{r}
-rm(list =ls(all.names = T))
-gc()
+# rm(list =ls(all.names = T))
+# gc()
 library(tidyverse)
 library(data.table)
 library(dlm)
@@ -191,22 +191,6 @@ ggtaperedpacf(co2_ts_)
 autoplot(acf(AirPassengers, plot = FALSE), conf.int.fill = '#0000FF', conf.int.value = 0.8, conf.int.type = 'ma')
 autoplot(spec.ar(AirPassengers, plot = FALSE))
 autoplot(stl(AirPassengers, s.window = 'periodic'), ts.colour = 'blue')
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
 
 ```
 
